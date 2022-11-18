@@ -24,7 +24,7 @@ class ACMEAccount(Endpoint):
         "status": "status"
     }
 
-    def __init__(self, client, api_version="v1"):
+    def __init__(self, client, api_version="v2"):
         """Initialize the class.
 
         Note: The *all* method will be run on object instantiation to fetch all acme accounts
@@ -167,7 +167,7 @@ class ACMEAccount(Endpoint):
                 for domain in domains
             ]
         }
-        url = self._url(f"/{acme_id}/domains")
+        url = self._url(f"/{acme_id}/domain")
         result = self._client.post(url, data=data)
 
         return result.json()
@@ -186,9 +186,38 @@ class ACMEAccount(Endpoint):
                 for domain in domains
             ]
         }
-        url = self._url(f"/{acme_id}/domains")
+        url = self._url(f"/{acme_id}/domain")
         # Client().delete does not accept json, so work around it
         result = self._client.session.request("DELETE", url, json=data)
         result.raise_for_status()
+
+        return result.json()
+
+    def list_domains(self, acme_id, position=None, size=None, name=None,
+                     expiresWithinNextDays=None, stickyExpiresWithinNextDays=None):
+        """Return domains assigned to an ACME account.
+
+        :param int acme_id: The ID of the acme account to list domains for
+        :param int position: position of first domain to retrieve
+        :param int size: max number of domains to retrieve
+        :param str name: filter domain names matching this regex
+        :param int expiresWithinNextDays: filter domains whose DCV expires within N days
+        :param int stickyExpiresWithinNextDays: filter domains whose "stickyUntil" date expires within N days
+
+        :return dict: A dictionary containing domains assigned to the ACME account
+        """
+        params = dict()
+        if position is not None:
+            params['position'] = str(position)
+        if size is not None:
+            params['size'] = str(size)
+        if name is not None:
+            params['name'] = name
+        if expiresWithinNextDays is not None:
+            params['expiresWithinNextDays'] = expiresWithinNextDays
+        if stickyExpiresWithinNextDays is not None:
+            params['stickyExpiresWithinNextDays'] = stickyExpiresWithinNextDays
+        url = self._url(f'/{acme_id}/domain')
+        result = self._client.get(url, params=params)
 
         return result.json()
