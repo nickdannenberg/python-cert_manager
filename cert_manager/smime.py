@@ -21,6 +21,7 @@ class SMIME(Certificates):
         super().__init__(client=client, endpoint="/smime", api_version=api_version)
 
     @paginate
+    @version_hack(service="smime", version="v2")
     def list(self, **kwargs):
         """Return a list of all clients certificates from Sectigo.
 
