@@ -115,20 +115,24 @@ class SMIME(Certificates):
 
         return result.json()
 
-    def collect(self, cert_id):
+    def collect(self, cert_id, output_format=None):
         """Retrieve an existing client certificate from the API.
 
         This method will raise a Pending exception if the certificate is still in a pending state.
 
         :param int cert_id: The Certificate ID given on enroll success
+        :param str output_format: Format for returned certificate
         :return str: the string representing the certificate in the requested format
         """
         if not cert_id:
             raise ValueError("Argument 'cert_id' can't be None")
         url = self._url(f"/collect/{cert_id}")
 
+        params = {}
+        if output_format:
+            params["format"] = output_format
         try:
-            result = self._client.get(url)
+            result = self._client.get(url, params=params)
         except HTTPError as exc:
             jsondata = exc.response.json()
             err_code = jsondata.get("code")
