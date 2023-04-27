@@ -151,9 +151,18 @@ def paginate(func):
 
 class Pending(Exception):
     """Serve as a generic Exception indicating a certificate is in a pending state."""
-    CODE = -183
+
+    CODE = [-183]
 
 
 class Revoked(Exception):
     """Serve as a generic Exception indicating a certificate has been revoked"""
-    CODE = -192
+
+    CODE = [
+        -192,
+        -8325,
+    ]
+
+
+class SectigoError(Exception):
+    """Error returned by SECTIGO API"""

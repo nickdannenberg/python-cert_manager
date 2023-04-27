@@ -3,7 +3,7 @@
 import logging
 from requests.exceptions import HTTPError
 from ._certificates import Certificates
-from ._helpers import Pending, Revoked
+from ._helpers import Pending, Revoked, SectigoError
 from ._helpers import paginate, version_hack
 
 LOGGER = logging.getLogger(__name__)
@@ -130,11 +130,19 @@ class SMIME(Certificates):
         try:
             result = self._client.get(url)
         except HTTPError as exc:
-            err_code = exc.response.json().get("code")
-            if err_code == Revoked.CODE:
+            jsondata = exc.response.json()
+            err_code = jsondata.get("code")
+            if err_code in Revoked.CODE:
                 raise Revoked(f"certificate {cert_id} in 'revoked' state") from exc
-            if err_code == Pending.CODE:
-                raise Pending(f"certificate {cert_id} still in 'pending' state") from exc
+            if err_code in Pending.CODE:
+                raise Pending(
+                    f"certificate {cert_id} still in 'pending' state"
+                ) from exc
+            if err_code:
+                raise SectigoError(
+                    f"SECTIGO API error, code: {err_code}, "
+                    + f"message: {jsondata.get('description')}/{jsondata.get('details')}"
+                ) from exc
             raise exc
 
         # The certificate is ready for collection
