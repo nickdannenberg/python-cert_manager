@@ -12,6 +12,21 @@ from ._helpers import traffic_log
 
 LOGGER = logging.getLogger(__name__)
 
+def _response_hook(response, **kwargs):
+    "Try to decode API error responses as json and set reason"
+    #LOGGER.warning('RESPONSE hook called')
+    if response.status_code >= 400:
+        try:
+            #LOGGER.warning('Running response hook for API error')
+            j = response.json()
+            detail = j.get("detail")
+            code = j.get("code")
+            descr = j.get("description")
+            response.reason = f"code: {code}, {descr}"
+            #LOGGER.warning(f'reason: {response.reason}')
+        except Exception as err:
+            LOGGER.warning(f'error building reason: {err}')
+
 
 class Client:  # pylint: disable=too-many-instance-attributes
     """Serve as a Base class for calls to the Sectigo Cert Manager APIs."""
@@ -153,7 +168,8 @@ class Client:  # pylint: disable=too-many-instance-attributes
         :param dict params: A dictionary with any parameters to add to the request URL
         :return obj: A requests.Response object received as a response
         """
-        result = self.__session.get(url, headers=headers, params=params)
+        result = self.__session.get(url, headers=headers, params=params,
+                                    hooks={"response": _response_hook})
         # Raise an exception if the return code is in an error range
         result.raise_for_status()
 
@@ -168,7 +184,10 @@ class Client:  # pylint: disable=too-many-instance-attributes
         :param dict data: A dictionary with the data to use for the body of the POST
         :return obj: A requests.Response object received as a response
         """
-        result = self.__session.post(url, json=data, headers=headers)
+        result = self.__session.post(url, json=data, headers=headers,
+                                     hooks={"response": _response_hook})
+        if result.reason:
+            LOGGER.warning(f"API error reason: {result.reason}")
         # Raise an exception if the return code is in an error range
         result.raise_for_status()
 
@@ -198,7 +217,8 @@ class Client:  # pylint: disable=too-many-instance-attributes
         :param dict data: A dictionary with the data to use for the body of the DELETE
         :return obj: A requests.Response object received as a response
         """
-        result = self.__session.delete(url, json=data, headers=headers)
+        result = self.__session.delete(url, json=data, headers=headers,
+                                       hooks={"response": _response_hook})
         # Raise an exception if the return code is in an error range
         result.raise_for_status()
 
