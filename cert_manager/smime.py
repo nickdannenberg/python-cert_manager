@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """Define the cert_manager.certificates.smime.SMIME class."""
 import logging
+
 from requests.exceptions import HTTPError
+
 from ._certificates import Certificates
-from ._helpers import Pending, Revoked, SectigoError
-from ._helpers import paginate, version_hack
+from ._helpers import Pending, Revoked, SectigoError, paginate, version_hack
 
 LOGGER = logging.getLogger(__name__)
 
@@ -69,6 +70,7 @@ class SMIME(Certificates):
         :param int org_id: The ID of the organization in which to enroll the certificate
         :param list custom_fields: zero or more objects representing custom fields and their values
             Note: each object must have a 'name' key and a 'value' key
+        :param int timeout: request timeout
         :return dict: The orderNumber (Obsolete, backendCertId should be used instead) and backendCertId
         """
         # Retrieve all the arguments
@@ -99,24 +101,36 @@ class SMIME(Certificates):
             # You have to do the list/map/str thing because join can only operate on
             # a list of strings, and this will be a list of numbers
             trm = ", ".join(list(map(str, terms)))
-            raise Exception(f"Incorrect term specified: {term}.  Valid terms are {trm}.")
+            raise Exception(
+                f"Incorrect term specified: {term}.  Valid terms are {trm}."
+            )
 
         self._validate_custom_fields(custom_fields)
 
         url = self._url("/enroll")
         data = {
-            "orgId": org_id, "csr": csr.rstrip(), "certType": type_id, "term": term,
-            "email": email, "phone": phone, "secondaryEmails": secondary_emails,
-            "firstName": first_name, "middleName": middle_name, "lastName": last_name,
-            "commonName": common_name, "eppn": eppn, "upn": upn,
+            "orgId": org_id,
+            "csr": csr.rstrip(),
+            "certType": type_id,
+            "term": term,
+            "email": email,
+            "phone": phone,
+            "secondaryEmails": secondary_emails,
+            "firstName": first_name,
+            "middleName": middle_name,
+            "lastName": last_name,
+            "commonName": common_name,
+            "eppn": eppn,
+            "upn": upn,
         }
         if custom_fields:
-            data['customFields'] = custom_fields
-        result = self._client.post(url, data=data)
+            data["customFields"] = custom_fields
+        timeout = kwargs.pop("timeout", None)
+        result = self._client.post(url, data=data, timeout=timeout)
 
         return result.json()
 
-    def collect(self, cert_id, output_format=None):
+    def collect(self, cert_id, output_format=None, timeout=None):
         """Retrieve an existing client certificate from the API.
 
         This method will raise a Pending exception if the certificate is still in a pending state.
@@ -133,7 +147,7 @@ class SMIME(Certificates):
         if output_format:
             params["format"] = output_format
         try:
-            result = self._client.get(url, params=params)
+            result = self._client.get(url, params=params, timeout=timeout)
         except HTTPError as exc:
             jsondata = exc.response.json()
             err_code = jsondata.get("code")
@@ -207,7 +221,9 @@ class SMIME(Certificates):
 
         # Sectigo has a 512 character limit on the "reason" message, so catch that here.
         if (not reason) or (len(reason) > 511):
-            raise ValueError("Sectigo limit: reason must be > 0 character and < 512 characters")
+            raise ValueError(
+                "Sectigo limit: reason must be > 0 character and < 512 characters"
+            )
 
         data = {"reason": reason}
         self._client.post(url, data=data)
@@ -226,7 +242,9 @@ class SMIME(Certificates):
 
         # Sectigo has a 512 character limit on the "reason" message, so catch that here.
         if (not reason) or (len(reason) > 511):
-            raise ValueError("Sectigo limit: reason must be > 0 character and < 512 characters")
+            raise ValueError(
+                "Sectigo limit: reason must be > 0 character and < 512 characters"
+            )
 
         data = {"email": email, "reason": reason}
         self._client.post(url, data=data)

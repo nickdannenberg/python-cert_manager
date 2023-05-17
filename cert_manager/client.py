@@ -12,31 +12,32 @@ from ._helpers import traffic_log
 
 LOGGER = logging.getLogger(__name__)
 
+
 def _response_hook(response, **kwargs):
     "Try to decode API error responses as json and set reason"
-    #LOGGER.warning('RESPONSE hook called')
+    # LOGGER.warning('RESPONSE hook called')
     if response.status_code >= 400:
         try:
-            #LOGGER.warning('Running response hook for API error')
+            # LOGGER.warning('Running response hook for API error')
             j = response.json()
             detail = j.get("detail")
             code = j.get("code")
             descr = j.get("description")
             response.reason = f"code: {code}, {descr}"
-            #LOGGER.warning(f'reason: {response.reason}')
+            # LOGGER.warning(f'reason: {response.reason}')
         except Exception as err:
-            LOGGER.warning(f'error building reason: {err}')
+            LOGGER.warning(f"error building reason: {err}")
 
 
 class Client:  # pylint: disable=too-many-instance-attributes
     """Serve as a Base class for calls to the Sectigo Cert Manager APIs."""
 
     DOWNLOAD_TYPES = [
-        "base64",   # PKCS#7 Base64 encoded
-        "bin",      # PKCS#7 Bin encoded
-        "x509",     # X509, Base64 encoded
-        "x509CO",   # X509 Certificate only, Base64 encoded
-        "x509IO",   # X509 Intermediates/root only, Base64 encoded
+        "base64",  # PKCS#7 Base64 encoded
+        "bin",  # PKCS#7 Bin encoded
+        "x509",  # X509, Base64 encoded
+        "x509CO",  # X509 Certificate only, Base64 encoded
+        "x509IO",  # X509 Intermediates/root only, Base64 encoded
         "x509IOR",  # X509 Intermediates/root only Reverse, Base64 encoded
     ]
 
@@ -82,7 +83,9 @@ class Client:  # pylint: disable=too-many-instance-attributes
             # Warn about using /api instead of /private/api if doing certificate auth
             if not re.search("/private", self.__base_url):
                 cert_uri = re.sub("/api", "/private/api", self.__base_url)
-                LOGGER.warning("base URI should probably be %s due to certificate auth", cert_uri)
+                LOGGER.warning(
+                    "base URI should probably be %s due to certificate auth", cert_uri
+                )
 
         else:
             # If we're not doing certificate auth, we need a password, so make sure an exception is raised if
@@ -145,7 +148,7 @@ class Client:  # pylint: disable=too-many-instance-attributes
                     del self.__session.headers[head]
 
     @traffic_log(traffic_logger=LOGGER)
-    def head(self, url, headers=None, params=None):
+    def head(self, url, headers=None, params=None, timeout=None):
         """Submit a HEAD request to the provided URL.
 
         :param str url: A URL to query
@@ -153,14 +156,16 @@ class Client:  # pylint: disable=too-many-instance-attributes
         :param dict params: A dictionary with any parameters to add to the request URL
         :return obj: A requests.Response object received as a response
         """
-        result = self.__session.head(url, headers=headers, params=params)
+        result = self.__session.head(
+            url, headers=headers, params=params, timeout=timeout
+        )
         # Raise an exception if the return code is in an error range
         result.raise_for_status()
 
         return result
 
     @traffic_log(traffic_logger=LOGGER)
-    def get(self, url, headers=None, params=None):
+    def get(self, url, headers=None, params=None, timeout=None):
         """Submit a GET request to the provided URL.
 
         :param str url: A URL to query
@@ -168,15 +173,20 @@ class Client:  # pylint: disable=too-many-instance-attributes
         :param dict params: A dictionary with any parameters to add to the request URL
         :return obj: A requests.Response object received as a response
         """
-        result = self.__session.get(url, headers=headers, params=params,
-                                    hooks={"response": _response_hook})
+        result = self.__session.get(
+            url,
+            headers=headers,
+            params=params,
+            hooks={"response": _response_hook},
+            timeout=timeout,
+        )
         # Raise an exception if the return code is in an error range
         result.raise_for_status()
 
         return result
 
     @traffic_log(traffic_logger=LOGGER)
-    def post(self, url, headers=None, data=None):
+    def post(self, url, headers=None, data=None, timeout=None):
         """Submit a POST request to the provided URL and data.
 
         :param str url: A URL to query
@@ -184,8 +194,13 @@ class Client:  # pylint: disable=too-many-instance-attributes
         :param dict data: A dictionary with the data to use for the body of the POST
         :return obj: A requests.Response object received as a response
         """
-        result = self.__session.post(url, json=data, headers=headers,
-                                     hooks={"response": _response_hook})
+        result = self.__session.post(
+            url,
+            json=data,
+            headers=headers,
+            hooks={"response": _response_hook},
+            timeout=timeout,
+        )
         if result.reason:
             LOGGER.warning(f"API error reason: {result.reason}")
         # Raise an exception if the return code is in an error range
@@ -194,7 +209,7 @@ class Client:  # pylint: disable=too-many-instance-attributes
         return result
 
     @traffic_log(traffic_logger=LOGGER)
-    def put(self, url, headers=None, data=None):
+    def put(self, url, headers=None, data=None, timeout=None):
         """Submit a PUT request to the provided URL and data.
 
         :param str url: A URL to query
@@ -202,14 +217,14 @@ class Client:  # pylint: disable=too-many-instance-attributes
         :param dict data: A dictionary with the data to use for the body of the PUT
         :return obj: A requests.Response object received as a response
         """
-        result = self.__session.put(url, json=data, headers=headers)
+        result = self.__session.put(url, json=data, headers=headers, timeout=timeout)
         # Raise an exception if the return code is in an error range
         result.raise_for_status()
 
         return result
 
     @traffic_log(traffic_logger=LOGGER)
-    def delete(self, url, headers=None, data=None):
+    def delete(self, url, headers=None, data=None, timeout=None):
         """Submit a DELETE request to the provided URL.
 
         :param str url: A URL to query
@@ -217,8 +232,13 @@ class Client:  # pylint: disable=too-many-instance-attributes
         :param dict data: A dictionary with the data to use for the body of the DELETE
         :return obj: A requests.Response object received as a response
         """
-        result = self.__session.delete(url, json=data, headers=headers,
-                                       hooks={"response": _response_hook})
+        result = self.__session.delete(
+            url,
+            json=data,
+            headers=headers,
+            hooks={"response": _response_hook},
+            timeout=timeout,
+        )
         # Raise an exception if the return code is in an error range
         result.raise_for_status()
 
