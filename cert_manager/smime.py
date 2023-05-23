@@ -207,17 +207,28 @@ class SMIME(Certificates):
 
         return ret.json()
 
-    def revoke(self, cert_id, reason=""):
-        """Revoke a client certificate specified by the certificate ID.
+    def revoke(
+        self,
+        cert_id: int = None,
+        serial: str = None,
+        reason_code: int = None,
+        reason: str = None,
+    ):
+        """Revoke a client certificate specified by the certificate ID or serial.
 
         :param int cert_id: The certificate ID
+        :param int serial: The certificate serial number
+        :param int reason_code: Reason for revocation (0,1,3,4,5)
         :param str reason: The Reason for revocation.
             Reason can be up to 512 characters and cannot be blank (i.e. empty string)
         """
-        url = self._url(f"/revoke/order/{cert_id}")
+        if not (cert_id or serial):
+            raise ValueError("Argument `cert_id` or `serial` must be given")
 
-        if not cert_id:
-            raise ValueError("Argument 'cert_id' can't be None")
+        if cert_id:
+            url = self._url(f"/revoke/order/{cert_id}")
+        else:
+            url = self._url(f"/revoke/serial/{serial}")
 
         # Sectigo has a 512 character limit on the "reason" message, so catch that here.
         if (not reason) or (len(reason) > 511):
@@ -225,8 +236,14 @@ class SMIME(Certificates):
                 "Sectigo limit: reason must be > 0 character and < 512 characters"
             )
 
-        data = {"reason": reason}
-        self._client.post(url, data=data)
+        if reason_code and not reason_code in (0, 1, 3, 4, 5):
+            raise ValueError("reason code must be one of: 0, 1, 3, 4, 5")
+        data = {}
+        if reason:
+            data["reason"] = reason
+        if reason_code:
+            data["reasonCode"] = reason_code
+        return self._client.post(url, data=data)
 
     def revoke_by_email(self, email, reason=""):
         """Revoke all client certificate related to an email
