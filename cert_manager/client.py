@@ -21,10 +21,12 @@ def _response_hook(response, **kwargs):
             # LOGGER.warning('Running response hook for API error')
             j = response.json()
             detail = j.get("detail")
+            details = j.get("details")
             code = j.get("code")
             descr = j.get("description")
-            response.reason = f"code: {code}, {descr}"
-            # LOGGER.warning(f'reason: {response.reason}')
+            response.reason += ", ".join(
+                filter(None, [str(code), descr, detail, details])
+            )
         except Exception as err:
             LOGGER.warning(f"error building reason: {err}")
 
@@ -58,7 +60,9 @@ class Client:  # pylint: disable=too-many-instance-attributes
         self.__username = kwargs["username"]
 
         # Using get for consistency and to allow defaults to be easily set
-        self.__base_url = kwargs.get("base_url", "https://cert-manager.com/api")
+        self.__base_url = kwargs.get(
+            "base_url", "https://cert-manager.com/api"
+        )
         self.__cert_auth = kwargs.get("cert_auth", False)
         self.__session = requests.Session()
 
@@ -78,13 +82,19 @@ class Client:  # pylint: disable=too-many-instance-attributes
             # Require keys if cert_auth is True or raise a KeyError
             self.__user_crt_file = kwargs["user_crt_file"]
             self.__user_key_file = kwargs["user_key_file"]
-            self.__session.cert = (self.__user_crt_file, self.__user_key_file)
+            self.__session.cert = (
+                self.__user_crt_file,
+                self.__user_key_file,
+            )
 
             # Warn about using /api instead of /private/api if doing certificate auth
             if not re.search("/private", self.__base_url):
-                cert_uri = re.sub("/api", "/private/api", self.__base_url)
+                cert_uri = re.sub(
+                    "/api", "/private/api", self.__base_url
+                )
                 LOGGER.warning(
-                    "base URI should probably be %s due to certificate auth", cert_uri
+                    "base URI should probably be %s due to certificate auth",
+                    cert_uri,
                 )
 
         else:
@@ -100,7 +110,9 @@ class Client:  # pylint: disable=too-many-instance-attributes
         """Return a user-agent string including the module version and Python version."""
         ver_info = list(map(str, sys.version_info))
         pyver = ".".join(ver_info[:3])
-        useragent = f"cert_manager/{__version__.__version__} (Python {pyver})"
+        useragent = (
+            f"cert_manager/{__version__.__version__} (Python {pyver})"
+        )
 
         return useragent
 
@@ -217,7 +229,9 @@ class Client:  # pylint: disable=too-many-instance-attributes
         :param dict data: A dictionary with the data to use for the body of the PUT
         :return obj: A requests.Response object received as a response
         """
-        result = self.__session.put(url, json=data, headers=headers, timeout=timeout)
+        result = self.__session.put(
+            url, json=data, headers=headers, timeout=timeout
+        )
         # Raise an exception if the return code is in an error range
         result.raise_for_status()
 
