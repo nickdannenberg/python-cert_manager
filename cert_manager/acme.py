@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """Define the cert_manager.acme.ACMEAccount class."""
 
-import re
 import logging
+import re
 
 from ._endpoint import Endpoint
 from ._helpers import paginate
@@ -16,12 +16,15 @@ class ACMEAccountCreationResponseError(Exception):
 
 class ACMEAccount(Endpoint):
     """Query the Sectigo Cert Manager REST API for ACME Account data."""
+
     _find_params_to_api = {
         "org_id": "organizationId",
         "name": "name",
         "acme_server": "acmeServer",
         "cert_validation_type": "certValidationType",
-        "status": "status"
+        "status": "status",
+        "size": "size",
+        "position": "position",
     }
 
     def __init__(self, client, api_version="v2"):
@@ -32,7 +35,9 @@ class ACMEAccount(Endpoint):
         :param object client: An instantiated cert_manager.Client object
         :param string api_version: The API version to use; the default is "v1"
         """
-        super().__init__(client=client, endpoint="/acme", api_version=api_version)
+        super().__init__(
+            client=client, endpoint="/acme", api_version=api_version
+        )
         self._api_url = self._url("/account")
 
         self.__acme_accounts = None
@@ -103,14 +108,16 @@ class ACMEAccount(Endpoint):
             "name": name,
             "acmeServer": acme_server,
             "organizationId": org_id,
-            "evDetails": ev_details or {}
+            "evDetails": ev_details or {},
         }
 
         result = self._client.post(self._api_url, data=data)
 
         # for status >= 400, HTTPError is raised
         if result.status_code != 201:
-            raise ACMEAccountCreationResponseError(f"Unexpected HTTP status {result.status_code}")
+            raise ACMEAccountCreationResponseError(
+                f"Unexpected HTTP status {result.status_code}"
+            )
         try:
             loc = result.headers["Location"]
             acme_id = re.search(r"/([0-9]+)$", loc)[1]
@@ -161,13 +168,11 @@ class ACMEAccount(Endpoint):
 
         :return dict: A dictionary containing a list of domains not added
         """
-        data = {
-            "domains": [
-                {"name": domain}
-                for domain in domains
-            ]
-        }
-        url = self._url(f"/{acme_id}/domain")
+        data = {"domains": [{"name": domain} for domain in domains]}
+        if self.api_version == "v1":
+            url = self._url(f"/{acme_id}/domains")
+        else:
+            url = self._url(f"/{acme_id}/domain")
         result = self._client.post(url, data=data)
 
         return result.json()
@@ -180,21 +185,25 @@ class ACMEAccount(Endpoint):
 
         :return dict: A dictionary containing a list of domains not removed
         """
-        data = {
-            "domains": [
-                {"name": domain}
-                for domain in domains
-            ]
-        }
+        data = {"domains": [{"name": domain} for domain in domains]}
         url = self._url(f"/{acme_id}/domain")
         # Client().delete does not accept json, so work around it
-        result = self._client.session.request("DELETE", url, json=data)
+        result = self._client.session.request(
+            "DELETE", url, json=data
+        )
         result.raise_for_status()
 
         return result.json()
 
-    def list_domains(self, acme_id, position=None, size=None, name=None,
-                     expiresWithinNextDays=None, stickyExpiresWithinNextDays=None):
+    def list_domains(
+        self,
+        acme_id,
+        position=None,
+        size=None,
+        name=None,
+        expiresWithinNextDays=None,
+        stickyExpiresWithinNextDays=None,
+    ):
         """Return domains assigned to an ACME account.
 
         :param int acme_id: The ID of the acme account to list domains for
@@ -208,16 +217,18 @@ class ACMEAccount(Endpoint):
         """
         params = dict()
         if position is not None:
-            params['position'] = str(position)
+            params["position"] = str(position)
         if size is not None:
-            params['size'] = str(size)
+            params["size"] = str(size)
         if name is not None:
-            params['name'] = name
+            params["name"] = name
         if expiresWithinNextDays is not None:
-            params['expiresWithinNextDays'] = expiresWithinNextDays
+            params["expiresWithinNextDays"] = expiresWithinNextDays
         if stickyExpiresWithinNextDays is not None:
-            params['stickyExpiresWithinNextDays'] = stickyExpiresWithinNextDays
-        url = self._url(f'/{acme_id}/domain')
+            params[
+                "stickyExpiresWithinNextDays"
+            ] = stickyExpiresWithinNextDays
+        url = self._url(f"/{acme_id}/domain")
         result = self._client.get(url, params=params)
 
         return result.json()

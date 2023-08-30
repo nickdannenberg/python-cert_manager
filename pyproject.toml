@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "cert_manager"
-version = "2.3.0"
+version = "2.3.1"
 description = "Python interface to the Sectigo Certificate Manager REST API"
 license = "BSD-3-Clause"
 authors = ["Andrew Teixeira <teixeira@broadinstitute.org>"]
@@ -16,7 +16,6 @@ toml = ">=0.9,<0.11"
 
 [tool.poetry.dev-dependencies]
 bump2version = "*"
-codecov = "*"
 coverage = ">=4.4.2"
 fixtures = "*"
 green = ">=2.12.0"
@@ -26,10 +25,9 @@ pydocstyle = "<7"
 pyflakes = "< 2.5.0"
 pylama = "*"
 pylint = "*"
-pyyaml = "==6.0"
+pyyaml = "==6.0.1"
 responses = "*"
 testtools = "*"
 twine = "*"
-unittest2 = ">=1.1.0"
 wheel = "*"
 yamllint = "*"
