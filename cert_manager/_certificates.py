@@ -72,7 +72,7 @@ class Certificates(Endpoint):
         """
         # Only go to the API if we haven't done the API call yet, or if someone
         # specifically wants to refresh the internal cache
-        if not self.__custom_fields:
+        if self.__custom_fields is None:
             url = self._url("/customFields")
             result = self._client.get(url)
 

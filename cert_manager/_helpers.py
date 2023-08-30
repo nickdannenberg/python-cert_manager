@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """Define helper functions used by classes in this module."""
 
-from functools import wraps
 import logging
 import re
+from functools import wraps
 
 from requests.exceptions import HTTPError
 
@@ -19,14 +19,18 @@ def traffic_log(traffic_logger=None):
 
     :param obj traffic_logger: a logging.Logger to use for logging messages.
     """
+
     def decorator(func):
         """Wrap the actual decorator so a reference to the function can be returned."""
+
         @wraps(func)
         def log_traffic(*args, **kwargs):
             """Decorate the wrapped function."""
             # Make sure traffic_logger was set correctly
             if not isinstance(traffic_logger, logging.Logger):
-                raise Exception("traffic_log: No logging.Logger instance provided")
+                raise Exception(
+                    "traffic_log: No logging.Logger instance provided"
+                )
 
             # Try to get rid of surrounding underscores and then upcase function name
             func_name = func.__name__
@@ -50,7 +54,9 @@ def traffic_log(traffic_logger=None):
                     data = args[3]
 
             # Print out before messages with URL and header data
-            traffic_logger.debug(f"Performing a {func_name} on url: {url}")
+            traffic_logger.debug(
+                f"Performing a {func_name} on url: {url}"
+            )
             traffic_logger.debug(f"Extra request headers: {headers}")
             traffic_logger.debug(f"Data: {data}")
 
@@ -59,9 +65,15 @@ def traffic_log(traffic_logger=None):
                 result = func(*args, **kwargs)
             except HTTPError as herr:
                 # If it's of type HTTPError, we can still usually get the result data
-                traffic_logger.debug(f"Result code: {herr.response.status_code}")
-                traffic_logger.debug(f"Result headers: {herr.response.headers}")
-                traffic_logger.debug(f"Text result: {herr.response.text}")
+                traffic_logger.debug(
+                    f"Result code: {herr.response.status_code}"
+                )
+                traffic_logger.debug(
+                    f"Result headers: {herr.response.headers}"
+                )
+                traffic_logger.debug(
+                    f"Text result: {herr.response.text}"
+                )
 
                 # Re-raise the original exception
                 raise herr
@@ -71,11 +83,17 @@ def traffic_log(traffic_logger=None):
 
             # If everything went fine, more logging
             if result:
-                traffic_logger.debug(f"Result code: {result.status_code}")
-                traffic_logger.debug(f"Result headers: {result.headers}")
+                traffic_logger.debug(
+                    f"Result code: {result.status_code}"
+                )
+                traffic_logger.debug(
+                    f"Result headers: {result.headers}"
+                )
                 traffic_logger.debug(f"Text result: {result.text}")
             return result
+
         return log_traffic
+
     return decorator
 
 
@@ -89,8 +107,10 @@ def version_hack(service, version="v1"):
 
     :param version: API version string to use. If None, 'v1'
     """
+
     def decorator(func):
         """Wrap the actual decorator so a reference to the function can be returned."""
+
         @wraps(func)
         def api_version(self, *args, **kwargs):
             """Decorate the wrapped function."""
@@ -99,7 +119,9 @@ def version_hack(service, version="v1"):
             if not version:
                 raise Exception("version_hack: No version provided")
 
-            api = self.create_api_url(self._client.base_url, service, version)  # pylint: disable=protected-access
+            api = self.create_api_url(
+                self._client.base_url, service, version
+            )  # pylint: disable=protected-access
             save_url = self.api_url
             self._api_url = api  # pylint: disable=protected-access
 
@@ -107,12 +129,16 @@ def version_hack(service, version="v1"):
                 retval = func(self, *args, **kwargs)
 
                 # Reset the api_url back to the original
-                self._api_url = save_url    # pylint: disable=protected-access
+                self._api_url = (
+                    save_url  # pylint: disable=protected-access
+                )
 
                 return retval
             except Exception as exc:
                 # Reset the api_url back to the original
-                self._api_url = save_url    # pylint: disable=protected-access
+                self._api_url = (
+                    save_url  # pylint: disable=protected-access
+                )
                 raise exc
 
         return api_version  # true decorator
@@ -136,12 +162,16 @@ def paginate(func):
 
         :return obj: Yield results from the wrapped function's response for each request
         """
-        size = kwargs.pop("size", 200)  # max seems to be 200 by default
+        size = kwargs.pop(
+            "size", 200
+        )  # max seems to be 200 by default
         position = kwargs.pop("position", 0)  # 0-..
 
         lastsize = size
         while lastsize == size:
-            retval = func(*args, size=size, position=position, **kwargs)
+            retval = func(
+                *args, size=size, position=position, **kwargs
+            )
             lastsize = len(retval)
             position += size
             yield from retval
@@ -151,13 +181,22 @@ def paginate(func):
 
 class Pending(Exception):
     """Serve as a generic Exception indicating a certificate is in a pending state."""
-    CODE = -183
+
+    CODE = [-183]
 
 
 class Revoked(Exception):
     """Serve as a generic Exception indicating a certificate has been revoked"""
-    CODE = -192
+
+    CODE = [
+        -192,
+        -8325,
+    ]
 
 
 class CustomFieldsError(Exception):
     """Exception when custom fields do not have correct data."""
+
+
+class SectigoError(Exception):
+    """Error returned by SECTIGO API"""

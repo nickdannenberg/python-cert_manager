@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """Define the cert_manager.certificates.smime.SMIME class."""
 import logging
+
 from requests.exceptions import HTTPError
+
 from ._certificates import Certificates
-from ._helpers import Pending, Revoked
-from ._helpers import paginate, version_hack
+from ._helpers import Pending, Revoked, SectigoError, paginate, version_hack
 
 LOGGER = logging.getLogger(__name__)
 
@@ -21,6 +22,7 @@ class SMIME(Certificates):
         super().__init__(client=client, endpoint="/smime", api_version=api_version)
 
     @paginate
+    @version_hack(service="smime", version="v2")
     def list(self, **kwargs):
         """Return a list of all clients certificates from Sectigo.
 
@@ -68,6 +70,7 @@ class SMIME(Certificates):
         :param int org_id: The ID of the organization in which to enroll the certificate
         :param list custom_fields: zero or more objects representing custom fields and their values
             Note: each object must have a 'name' key and a 'value' key
+        :param int timeout: request timeout
         :return dict: The orderNumber (Obsolete, backendCertId should be used instead) and backendCertId
         """
         # Retrieve all the arguments
@@ -98,43 +101,67 @@ class SMIME(Certificates):
             # You have to do the list/map/str thing because join can only operate on
             # a list of strings, and this will be a list of numbers
             trm = ", ".join(list(map(str, terms)))
-            raise Exception(f"Incorrect term specified: {term}.  Valid terms are {trm}.")
+            raise Exception(
+                f"Incorrect term specified: {term}.  Valid terms are {trm}."
+            )
 
         self._validate_custom_fields(custom_fields)
 
         url = self._url("/enroll")
         data = {
-            "orgId": org_id, "csr": csr.rstrip(), "certType": type_id, "term": term,
-            "email": email, "phone": phone, "secondaryEmails": secondary_emails,
-            "firstName": first_name, "middleName": middle_name, "lastName": last_name,
-            "commonName": common_name, "eppn": eppn, "upn": upn,
+            "orgId": org_id,
+            "csr": csr.rstrip(),
+            "certType": type_id,
+            "term": term,
+            "email": email,
+            "phone": phone,
+            "secondaryEmails": secondary_emails,
+            "firstName": first_name,
+            "middleName": middle_name,
+            "lastName": last_name,
+            "commonName": common_name,
+            "eppn": eppn,
+            "upn": upn,
         }
         if custom_fields:
-            data['customFields'] = custom_fields
-        result = self._client.post(url, data=data)
+            data["customFields"] = custom_fields
+        timeout = kwargs.pop("timeout", None)
+        result = self._client.post(url, data=data, timeout=timeout)
 
         return result.json()
 
-    def collect(self, cert_id):
+    def collect(self, cert_id, output_format=None, timeout=None):
         """Retrieve an existing client certificate from the API.
 
         This method will raise a Pending exception if the certificate is still in a pending state.
 
         :param int cert_id: The Certificate ID given on enroll success
+        :param str output_format: Format for returned certificate
         :return str: the string representing the certificate in the requested format
         """
         if not cert_id:
             raise ValueError("Argument 'cert_id' can't be None")
         url = self._url(f"/collect/{cert_id}")
 
+        params = {}
+        if output_format:
+            params["format"] = output_format
         try:
-            result = self._client.get(url)
+            result = self._client.get(url, params=params, timeout=timeout)
         except HTTPError as exc:
-            err_code = exc.response.json().get("code")
-            if err_code == Revoked.CODE:
+            jsondata = exc.response.json()
+            err_code = jsondata.get("code")
+            if err_code in Revoked.CODE:
                 raise Revoked(f"certificate {cert_id} in 'revoked' state") from exc
-            if err_code == Pending.CODE:
-                raise Pending(f"certificate {cert_id} still in 'pending' state") from exc
+            if err_code in Pending.CODE:
+                raise Pending(
+                    f"certificate {cert_id} still in 'pending' state"
+                ) from exc
+            if err_code:
+                raise SectigoError(
+                    f"SECTIGO API error, code: {err_code}, "
+                    + f"message: {jsondata.get('description')}/{jsondata.get('details')}"
+                ) from exc
             raise exc
 
         # The certificate is ready for collection
@@ -180,24 +207,43 @@ class SMIME(Certificates):
 
         return ret.json()
 
-    def revoke(self, cert_id, reason=""):
-        """Revoke a client certificate specified by the certificate ID.
+    def revoke(
+        self,
+        cert_id: int = None,
+        serial: str = None,
+        reason_code: int = None,
+        reason: str = None,
+    ):
+        """Revoke a client certificate specified by the certificate ID or serial.
 
         :param int cert_id: The certificate ID
+        :param int serial: The certificate serial number
+        :param int reason_code: Reason for revocation (0,1,3,4,5)
         :param str reason: The Reason for revocation.
             Reason can be up to 512 characters and cannot be blank (i.e. empty string)
         """
-        url = self._url(f"/revoke/order/{cert_id}")
+        if not (cert_id or serial):
+            raise ValueError("Argument `cert_id` or `serial` must be given")
 
-        if not cert_id:
-            raise ValueError("Argument 'cert_id' can't be None")
+        if cert_id:
+            url = self._url(f"/revoke/order/{cert_id}")
+        else:
+            url = self._url(f"/revoke/serial/{serial}")
 
         # Sectigo has a 512 character limit on the "reason" message, so catch that here.
         if (not reason) or (len(reason) > 511):
-            raise ValueError("Sectigo limit: reason must be > 0 character and < 512 characters")
+            raise ValueError(
+                "Sectigo limit: reason must be > 0 character and < 512 characters"
+            )
 
-        data = {"reason": reason}
-        self._client.post(url, data=data)
+        if reason_code and not reason_code in (0, 1, 3, 4, 5):
+            raise ValueError("reason code must be one of: 0, 1, 3, 4, 5")
+        data = {}
+        if reason:
+            data["reason"] = reason
+        if reason_code:
+            data["reasonCode"] = reason_code
+        return self._client.post(url, data=data)
 
     def revoke_by_email(self, email, reason=""):
         """Revoke all client certificate related to an email
@@ -213,7 +259,9 @@ class SMIME(Certificates):
 
         # Sectigo has a 512 character limit on the "reason" message, so catch that here.
         if (not reason) or (len(reason) > 511):
-            raise ValueError("Sectigo limit: reason must be > 0 character and < 512 characters")
+            raise ValueError(
+                "Sectigo limit: reason must be > 0 character and < 512 characters"
+            )
 
         data = {"email": email, "reason": reason}
         self._client.post(url, data=data)
