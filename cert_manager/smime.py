@@ -5,7 +5,7 @@ import logging
 from requests.exceptions import HTTPError
 
 from ._certificates import Certificates
-from ._helpers import Pending, Revoked, SectigoError, paginate, version_hack
+from ._helpers import Pending, Revoked, paginate, version_hack
 
 LOGGER = logging.getLogger(__name__)
 
@@ -156,11 +156,6 @@ class SMIME(Certificates):
             if err_code in Pending.CODE:
                 raise Pending(
                     f"certificate {cert_id} still in 'pending' state"
-                ) from exc
-            if err_code:
-                raise SectigoError(
-                    f"SECTIGO API error, code: {err_code}, "
-                    + f"message: {jsondata.get('description')}/{jsondata.get('details')}"
                 ) from exc
             raise exc
 

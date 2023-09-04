@@ -196,7 +196,3 @@ class Revoked(Exception):
 
 class CustomFieldsError(Exception):
     """Exception when custom fields do not have correct data."""
-
-
-class SectigoError(Exception):
-    """Error returned by SECTIGO API"""
