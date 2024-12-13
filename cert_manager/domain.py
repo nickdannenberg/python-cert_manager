@@ -4,7 +4,7 @@
 import re
 import logging
 from requests.exceptions import HTTPError
-
+from ._helpers import paginate
 from ._endpoint import Endpoint
 
 LOGGER = logging.getLogger(__name__)
@@ -37,12 +37,11 @@ class Domain(Endpoint):
         if (self.__domains) and (not force):
             return self.__domains
 
-        result = self._client.get(self._api_url)
-
-        self.__domains = result.json()
+        self.__domains = self.find()
 
         return self.__domains
 
+    @paginate
     def find(self, **kwargs):
         """Return a list of domains matching the given parameters from Sectigo.
 
@@ -51,7 +50,6 @@ class Domain(Endpoint):
         :return list: A list of dictionaries representing the domains that match the given parameters
         """
         result = self._client.get(self._api_url, params=kwargs)
-
         return result.json()
 
     def count(self, **kwargs):
